@@ -8,7 +8,7 @@ var _ = require('underscore');
  * Very basic single quote escaping
  */
 function insecure_escape(value) {
-    if (value !== null) return value.replace(/'/g, "\\\'");
+    if (value !== null) return value.replace(/'/g, "''");
     else return value;
 }
 
@@ -86,18 +86,10 @@ if (placesTotal == foundTotal) {
 
 // Write out SQL
 var output = "\
-DROP TABLE IF EXISTS places, tokens;\n\
-CREATE TABLE places (\n\
-  ref varchar(255),\n\
-  json TEXT,\n\
-  PRIMARY KEY (ref)\n\
-);\n\
-\n\
-CREATE TABLE tokens (\n\
-  token varchar(255),\n\
-  ref varchar(255)\n\
-);\n\
-\n";
+BEGIN TRANSACTION;\n\
+CREATE TABLE places (ref varchar(255), json TEXT, PRIMARY KEY (ref));\n\
+CREATE TABLE tokens (token varchar(255), ref varchar(255));\n\
+";
 
 var largestBlob = 0;
 
@@ -110,7 +102,7 @@ _.each(places.all, function (element, index, list) {
     var blob = insecure_escape(JSON.stringify(element));
     if(blob.length > largestBlob) largestBlob = blob.length;
 
-    output += "INSERT INTO places (ref, json) VALUES ('"+insecure_escape(element.id)+"','"+blob+"');\n";
+    output += "INSERT INTO places VALUES ('"+insecure_escape(element.id)+"','"+blob+"');\n";
 });
 
 // Add token insertion rows
@@ -118,9 +110,11 @@ _.each(tokens2refs, function (element, index, list) {
     var token = insecure_escape(index);
     element.forEach(function (ref) {
 	var ref = insecure_escape(ref);
-	output += "INSERT INTO tokens(token, ref) VALUES ('"+token+"', '"+ref+"');\n";
+	output += "INSERT INTO tokens VALUES ('"+token+"', '"+ref+"');\n";
     });
 });
+
+output += "COMMIT;\n";
 
 fs.writeFileSync(outpath, output);
 console.log("Wrote SQL file to " + outpath);
