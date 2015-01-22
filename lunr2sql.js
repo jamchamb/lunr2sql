@@ -1,5 +1,5 @@
 // lunr2sql
-// Construct FTS database from lunr index
+// Construct SQLite database from places/lunr index
 var fs = require('fs');
 var lunr = require('lunr');
 var _ = require('underscore');
@@ -7,21 +7,21 @@ var _ = require('underscore');
 /**
  * Very basic single quote escaping
  */
-function insecure_escape(value) {
+function insecureEscape(value) {
     if (value !== null) return value.replace(/'/g, "''");
     else return value;
 }
 
 /**
- * Recursively apply insecure_escape to strings in an object
+ * Recursively apply insecureEscape to strings in an object
  */
-function insecurely_escaped_copy(object) {
+function escapedCopy(object) {
     var copy = {};
     _.each(object, function (element, index, list) {
 	if (typeof element === 'string') {
-	    copy[index] = insecure_escape(element);
+	    copy[index] = insecureEscape(element);
 	} else if (typeof element === 'object') {
-	    copy[index] = insecurely_escaped_copy(element);
+	    copy[index] = escapedCopy(element);
 	} else {
 	    copy[index] = element;
 	}
@@ -99,17 +99,17 @@ _.each(places.all, function (element, index, list) {
 	console.warn(element.title + " is missing a location object");
     }
 
-    var blob = insecure_escape(JSON.stringify(element));
-    if(blob.length > largestBlob) largestBlob = blob.length;
+    var blob = insecureEscape(JSON.stringify(element));
+    if (blob.length > largestBlob) largestBlob = blob.length;
 
-    output += "INSERT INTO places VALUES ('"+insecure_escape(element.id)+"','"+blob+"');\n";
+    output += "INSERT INTO places VALUES ('"+insecureEscape(element.id)+"','"+blob+"');\n";
 });
 
 // Add token insertion rows
 _.each(tokens2refs, function (element, index, list) {
-    var token = insecure_escape(index);
+    var token = insecureEscape(index);
     element.forEach(function (ref) {
-	var ref = insecure_escape(ref);
+	var ref = insecureEscape(ref);
 	output += "INSERT INTO tokens VALUES ('"+token+"', '"+ref+"');\n";
     });
 });
