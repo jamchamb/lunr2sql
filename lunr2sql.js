@@ -50,10 +50,11 @@ var documentStore = places.lunr.documentStore;
 var placesTotal = documentStore.length;
 var found = {}; // table of found refs
 var tokens2refs = {}; // table of token->[ref,ref,ref,...]
+var skippedTokens = [];
 
 corpusTokens.forEach(function (token) {
     if(token.length < 2) {
-	console.log("Skipping over token \"" + token + "\"");
+	skippedTokens.push(token);
 	return;
     }
 
@@ -74,10 +75,12 @@ var foundTotal = _.size(found);
 // Verify that all documents will have a corresponding token so that they can be found.
 console.log("Document store size: " + placesTotal);
 console.log("Token iteration recovered " + foundTotal + " unique entries.");
+console.log("(Skipped tokens were: " + JSON.stringify(skippedTokens) + ")");
+
 if (placesTotal == foundTotal) {
     console.log("Successfully found tokens corresponding to all entries.");
 } else {
-    console.err("Failed to find tokens for all entries.");
+    console.error("Failed to find tokens for all entries.");
     process.exit(2);
 }
 
@@ -86,24 +89,7 @@ var output = "\
 DROP TABLE IF EXISTS places, tokens;\n\
 CREATE TABLE places (\n\
   ref varchar(255),\n\
-  title varchar(255),\n\
-  building_id varchar(10),\n\
-  building_number varchar(10),\n\
-  cid varchar(10),\n\
-  description varchar(2048),\n\
-  campus_code varchar(2),\n\
-  campus_name varchar(255),\n\
-  offices varchar(2048),\n\
-  location_name varchar(255),\n\
-  location_street varchar(255),\n\
-  location_state varchar(255),\n\
-  location_state_abbr varchar(2),\n\
-  location_country varchar(255),\n\
-  location_country_abbr varchar(5),\n\
-  location_country_additional varchar(255),\n\
-  location_postal_code varchar(10),\n\
-  location_latitude FLOAT,\n\
-  location_longitude FLOAT,\n\
+  json TEXT,\n\
   PRIMARY KEY (ref)\n\
 );\n\
 \n\
@@ -113,26 +99,18 @@ CREATE TABLE tokens (\n\
 );\n\
 \n";
 
+var largestBlob = 0;
+
 // Add place document insertion rows
 _.each(places.all, function (element, index, list) {
-    // Escape single quotes in all fields.
-    var copy = insecurely_escaped_copy(element);
-
-    if (copy.location === undefined) {
-	console.log(copy.title + " is missing a location object");
-	copy.location = {};
+    if (element.location === undefined) {
+	console.warn(element.title + " is missing a location object");
     }
 
-    var offices = "";
-    if (element.offices !== undefined) {
-	offices = insecure_escape(JSON.stringify(element.offices));
-    }
+    var blob = insecure_escape(JSON.stringify(element));
+    if(blob.length > largestBlob) largestBlob = blob.length;
 
-    output += "INSERT INTO places VALUES ('"+copy.id+"','"+copy.title+"','"+copy.building_id+"','"+copy.building_number+"'," +
-	"'"+copy.cid+"','"+copy.description+"','"+copy.campus_code+"','"+copy.campus_name+"','"+offices+"'," +
-	"'"+copy.location.name+"','"+copy.location.street+"','"+copy.location.state+"','"+copy.location.state_abbr+"'," + 
-	"'"+copy.location.country+"','"+copy.location.country_abbr+"','"+copy.location.additional+"','"+copy.location.postal_code+"'," + 
-	"'"+copy.location.latitude+"','"+copy.location.longitude+"');\n";
+    output += "INSERT INTO places (ref, json) VALUES ('"+insecure_escape(element.id)+"','"+blob+"');\n";
 });
 
 // Add token insertion rows
@@ -146,3 +124,4 @@ _.each(tokens2refs, function (element, index, list) {
 
 fs.writeFileSync(outpath, output);
 console.log("Wrote SQL file to " + outpath);
+console.log("Biggest encountered blob size: " + largestBlob + ".");
