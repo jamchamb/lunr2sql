@@ -8,7 +8,7 @@ var _ = require('underscore');
  * Very basic single quote escaping
  */
 function insecureEscape(value) {
-    if (value !== null) return value.replace(/'/g, "''");
+    if (value !== null && typeof value === 'string') return value.replace(/'/g, "''");
     else return value;
 }
 
@@ -87,7 +87,7 @@ if (placesTotal == foundTotal) {
 // Write out SQL
 var output = "\
 BEGIN TRANSACTION;\n\
-CREATE TABLE places (ref varchar(255), json TEXT, PRIMARY KEY (ref));\n\
+CREATE TABLE places (ref varchar(255), longitude FLOAT, latitude FLOAT, json TEXT, PRIMARY KEY (ref));\n\
 CREATE TABLE tokens (token varchar(255), ref varchar(255));\n\
 ";
 
@@ -97,12 +97,13 @@ var largestBlob = 0;
 _.each(places.all, function (element, index, list) {
     if (element.location === undefined) {
 	console.warn(element.title + " is missing a location object");
+	element.location = {longitude: 0.0, latitude: 0.0};
     }
 
     var blob = insecureEscape(JSON.stringify(element));
     if (blob.length > largestBlob) largestBlob = blob.length;
 
-    output += "INSERT INTO places VALUES ('"+insecureEscape(element.id)+"','"+blob+"');\n";
+    output += "INSERT INTO places VALUES ('"+insecureEscape(element.id)+"','"+insecureEscape(element.location.longitude)+"','"+insecureEscape(element.location.latitude)+"','"+blob+"');\n";
 });
 
 // Add token insertion rows
